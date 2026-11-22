@@ -121,7 +121,7 @@ Full guide: [docs/obs-overlay.md](docs/obs-overlay.md).
 - **More languages:** translations welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Disclaimer
-StatsCitizen is an unofficial fan project and is **not affiliated with or endorsed by Cloud Imperium Games**. Star Citizen®, Roberts Space Industries® and Cloud Imperium® are trademarks of Cloud Imperium Rights LLC. Manufacturer logos are © Cloud Imperium Rights LLC and are used under the [fan content terms](https://robertsspaceindustries.com/fankit).
+StatsCitizen is an unofficial fan project and is **not affiliated with or endorsed by Cloud Imperium Games**. Star Citizen®, Roberts Space Industries® and Cloud Imperium® are trademarks of Cloud Imperium Rights LLC. Manufacturer logos are © Cloud Imperium Rights LLC and are used under the [fan content terms](https://robertsspaceindustries.com/fankit) (see [NOTICE](NOTICE)).
 
 ## License
 [MIT](LICENSE). The code is free to use, modify and share. The CIG artwork mentioned above is excluded.
