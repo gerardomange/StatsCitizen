@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-electron/
+release/
+src-tauri/target/
+.hud-preview/dist/
+.overlay-preview/dist/
+*.exe
+*.msi
+
+# Star Citizen logs (contain your handle and player id) — never commit them
+*.log
+.log-review-tmp/
+logbackups/
+
+# Local environment / editor
+.env
+.env.*
+.vscode/
+.idea/
+*.local
+.DS_Store
+Thumbs.db

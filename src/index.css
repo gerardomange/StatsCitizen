@@ -1,0 +1,165 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* Default StatsCitizen accent (overridden at runtime by src/themes/manufacturers.ts) */
+  :root {
+    --accent: 0 240 255;
+    --accent-200: 165 243 252;
+    --accent-300: 103 232 249;
+    --accent-400: 34 211 238;
+    --accent-500: 6 182 212;
+    --accent-600: 8 145 178;
+    --hud-radius: 12px;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+    background-color: #05080f;
+    color: #e2e8f0;
+  }
+
+  /* Custom Sci-Fi Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: rgba(8, 14, 23, 0.7);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgb(var(--accent) / 0.2);
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(var(--accent) / 0.4);
+  }
+}
+
+/* Glassmorphism & Sci-Fi HUD effects */
+.glass-panel {
+  background: rgba(13, 19, 31, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgb(var(--accent) / 0.12);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
+}
+
+.glass-panel-hover:hover {
+  border-color: rgb(var(--accent) / 0.35);
+  box-shadow: 0 0 20px -3px rgb(var(--accent) / 0.18);
+}
+
+.glass-card-amber {
+  background: rgba(23, 19, 13, 0.65);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(245, 158, 11, 0.18);
+}
+
+.glass-card-crimson {
+  background: rgba(28, 12, 16, 0.65);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(239, 68, 68, 0.22);
+}
+
+/* Corner bracket cuts */
+.sc-bracket {
+  position: relative;
+}
+.sc-bracket::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  border-top: 2px solid rgb(var(--accent));
+  border-left: 2px solid rgb(var(--accent));
+}
+.sc-bracket::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 8px;
+  height: 8px;
+  border-bottom: 2px solid rgb(var(--accent));
+  border-right: 2px solid rgb(var(--accent));
+}
+
+/* Draggable titlebar */
+.drag-region {
+  -webkit-app-region: drag;
+}
+
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* Smooth re-brand when entering / leaving a ship */
+.theme-transition,
+.theme-transition * {
+  transition-property: color, background-color, border-color, box-shadow, fill, stroke;
+  transition-duration: 600ms;
+  transition-timing-function: ease;
+}
+
+/* Manufacturer logo rendered as a tinted silhouette */
+.mfg-logo {
+  display: inline-block;
+  background-color: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
+.hud-radius {
+  border-radius: var(--hud-radius);
+}
+
+@keyframes ecg-sweep {
+  from { stroke-dashoffset: 400; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes alert-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+/* Draggable HUD grid (react-grid-layout) */
+.hud-grid .react-grid-placeholder {
+  background: rgb(var(--accent) / 0.18) !important;
+  border: 1px dashed rgb(var(--accent) / 0.6);
+  border-radius: var(--hud-radius);
+  opacity: 1 !important;
+}
+.hud-grid .react-grid-item.react-draggable-dragging {
+  box-shadow: 0 0 28px -4px rgb(var(--accent) / 0.45);
+  z-index: 20;
+}
+.hud-grid .react-resizable-handle {
+  opacity: 0;
+}
+.hud-grid-editing .hud-grid .react-resizable-handle {
+  opacity: 1;
+}
+.hud-grid .react-resizable-handle::after {
+  border-color: rgb(var(--accent) / 0.8) !important;
+}
+.hud-grid-editing .hud-grid .react-grid-item > .glass-panel,
+.hud-grid-editing .react-grid-item.glass-panel {
+  outline: 1px dashed rgb(var(--accent) / 0.25);
+}

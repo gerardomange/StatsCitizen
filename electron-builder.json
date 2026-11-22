@@ -1,0 +1,16 @@
+{
+  "appId": "com.statscitizen.app",
+  "productName": "StatsCitizen",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "dist/**/*",
+    "dist-electron/**/*",
+    "package.json"
+  ],
+  "win": {
+    "target": "portable"
+  },
+  "compression": "normal"
+}
