@@ -1,6 +1,6 @@
 [package]
 name = "statscitizen"
-version = "2.0.0"
+version = "2.1.0"
 description = "Next-Generation Star Citizen Live Telemetry, Flight & Financial Companion"
 authors = ["StatsCitizen"]
 edition = "2021"

@@ -74,6 +74,9 @@ Add it to OBS as a **Browser Source**. It updates live, with no refreshing.
 
 ## Getting started
 
+### Download
+Grab the installer from **[Releases](https://github.com/gerardomange/StatsCitizen/releases/latest)** (`StatsCitizen_x.y.z_x64-setup.exe`, about 3 MB). A portable `.exe` is attached to each release too. The installer isn't code-signed yet: if SmartScreen warns you, click **More info → Run anyway**, or build it yourself with the steps below.
+
 ### Requirements
 - **Windows 10 or 11** with WebView2. It ships with Windows 11.
 - **Star Citizen** LIVE or PTU.
@@ -82,7 +85,7 @@ Add it to OBS as a **Browser Source**. It updates live, with no refreshing.
   - Rust (stable)
   - the [Tauri 2 prerequisites](https://v2.tauri.app/start/prerequisites/), meaning the MSVC build tools
 
-### Build and run
+### Build from source
 ```bash
 git clone https://github.com/gerardomange/StatsCitizen.git
 cd StatsCitizen

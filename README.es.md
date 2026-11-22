@@ -31,6 +31,9 @@
 - **Contra stream sniping:** el saldo total va oculto y la ubicación va apagada o con retraso por defecto.
 
 ## Cómo empezar
+**Descarga** el instalador desde **[Releases](https://github.com/gerardomange/StatsCitizen/releases/latest)** (unos 3 MB). También hay un `.exe` portable. El instalador todavía no está firmado: si Windows SmartScreen te avisa, da clic en **Más información → Ejecutar de todas formas**.
+
+O compílalo tú:
 ```bash
 npm install
 npm run dev      # desarrollo
