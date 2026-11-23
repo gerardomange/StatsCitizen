@@ -178,7 +178,7 @@ export const LiveCopilotView: React.FC<LiveCopilotViewProps> = ({
           <button
             onClick={() => setEditing((e) => !e)}
             className={editing ? BTN_ON : BTN_IDLE}
-            title={t('Move, resize or hide modules')}
+            title={t('Move, reorder or hide modules')}
           >
             {editing ? <Check className="w-3.5 h-3.5" /> : <LayoutGrid className="w-3.5 h-3.5" />}
             {editing ? t('Done') : t('Customize')}

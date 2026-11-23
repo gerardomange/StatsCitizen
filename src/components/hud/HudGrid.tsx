@@ -1,55 +1,56 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import { Responsive, WidthProvider, type Layout, type Layouts } from 'react-grid-layout';
-import 'react-grid-layout/css/styles.css';
-import 'react-resizable/css/styles.css';
-import { EyeOff, GripVertical, Plus } from 'lucide-react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { ArrowDown, ArrowUp, EyeOff, GripVertical, MoveHorizontal, Plus } from 'lucide-react';
 import { useT } from '../../i18n/index.js';
-import { DEFAULT_SLOTS, MODULES, ModuleCtx } from './modules.js';
+import { DEFAULT_ORDER, MODULES, ModuleCtx } from './modules.js';
 import type { HudMode } from './hudUtils.js';
 
-const ResponsiveGrid = WidthProvider(Responsive);
+/*
+ * Flow layout for the live HUD.
+ *
+ * The user only decides ORDER, which modules are HIDDEN and which are FULL-WIDTH.
+ * We never store coordinates, so the same arrangement works on any monitor:
+ *   1. The column count comes from the available width (1–4 columns).
+ *   2. Full-width modules split the list into sections; inside a section, modules are
+ *      placed in order into the currently shortest column (masonry), so no holes appear.
+ *   3. Only "elastic" modules (lists: feed, contracts, weapons) stretch to absorb leftover
+ *      height in their column and scroll inside; fixed-content modules keep their natural size.
+ *   4. The last section stretches to the bottom of the window.
+ */
 
-const BREAKPOINTS = { lg: 1000, md: 680, sm: 0 };
-const COLS = { lg: 12, md: 8, sm: 4 };
-const STORE_PREFIX = 'statscitizen.hudLayout.v1.';
+const STORE_PREFIX = 'statscitizen.hudFlow.v1.';
+const GAP = 12;
+const ELASTIC_MIN = 240; // px — also the height used for packing elastic modules
+const DEFAULT_ESTIMATE = 260;
 
 interface Saved {
-  layouts: Layouts;
+  order: string[];
   hidden: string[];
+  wide: string[];
 }
 
-function defaultLayouts(mode: HudMode, available: Set<string>): Layouts {
-  const slots = DEFAULT_SLOTS[mode].filter(([id]) => available.has(id));
-  const base = (cols: number): Layout[] =>
-    slots.map(([i, x, y, w, h]) => {
-      const scale = cols / 12;
-      const def = MODULES[i];
-      return {
-        i,
-        x: Math.min(Math.round(x * scale), cols - 1),
-        y,
-        w: Math.max(Math.round(w * scale), Math.min(def.minW ?? 1, cols)),
-        h,
-        minW: Math.min(def.minW ?? 1, cols),
-        minH: def.minH,
-      };
-    });
-  // Small screens: single column stack in default order.
-  let y = 0;
-  const sm = slots.map(([i, , , , h]) => {
-    const item = { i, x: 0, y, w: COLS.sm, h, minH: MODULES[i].minH };
-    y += h;
-    return item;
-  });
-  return { lg: base(COLS.lg), md: base(COLS.md), sm };
+const columnsFor = (width: number) => (width < 620 ? 1 : width < 1000 ? 2 : width < 1450 ? 3 : 4);
+
+function defaults(mode: HudMode): Saved {
+  const order = [...DEFAULT_ORDER[mode]];
+  return { order, hidden: [], wide: order.filter((id) => MODULES[id]?.wide) };
 }
 
-function load(mode: HudMode): Saved | null {
+function load(mode: HudMode): Saved {
+  const base = defaults(mode);
   try {
     const raw = localStorage.getItem(STORE_PREFIX + mode);
-    return raw ? (JSON.parse(raw) as Saved) : null;
+    if (!raw) return base;
+    const saved = JSON.parse(raw) as Partial<Saved>;
+    const allowed = new Set(base.order);
+    const order = (saved.order ?? []).filter((id) => allowed.has(id));
+    for (const id of base.order) if (!order.includes(id)) order.push(id); // modules added in later versions
+    return {
+      order,
+      hidden: (saved.hidden ?? []).filter((id) => allowed.has(id)),
+      wide: (saved.wide ?? base.wide).filter((id) => allowed.has(id)),
+    };
   } catch {
-    return null;
+    return base;
   }
 }
 
@@ -69,69 +70,267 @@ export function resetHudLayout(mode: HudMode) {
   }
 }
 
+type Section = { kind: 'wide'; id: string } | { kind: 'cols'; columns: string[][] };
+
 /**
- * Draggable / resizable HUD dashboard. Each mode keeps its own arrangement in localStorage.
- * Editing is off by default so a stray click never moves a module mid-flight.
+ * Masonry that keeps the user's order (each column lists modules in global order):
+ * every module goes into the currently shortest column, except elastic ones, which prefer
+ * the shortest column that has no elastic module yet — so as many columns as possible
+ * have something able to fill down to the bottom.
  */
+function pack(ids: string[], cols: number, heightOf: (id: string) => number): string[][] {
+  const columns = Array.from({ length: cols }, () => ({ h: 0, ids: [] as string[], elastic: false }));
+  const shortest = (list: typeof columns) => list.reduce((best, c) => (c.h < best.h - 1 ? c : best), list[0]);
+  for (const id of ids) {
+    const elastic = Boolean(MODULES[id].elastic);
+    const free = columns.filter((c) => !c.elastic);
+    const target = elastic && free.length ? shortest(free) : shortest(columns);
+    target.ids.push(id);
+    target.h += heightOf(id) + GAP;
+    if (elastic) target.elastic = true;
+  }
+  return columns.map((c) => c.ids);
+}
+
 export const HudGrid: React.FC<{ ctx: ModuleCtx; editing: boolean; resetKey: number }> = ({ ctx, editing, resetKey }) => {
   const t = useT();
   const mode = ctx.mode;
-  const available = useMemo(() => new Set(DEFAULT_SLOTS[mode].map(([id]) => id)), [mode]);
 
-  const initial = useMemo<Saved>(() => {
-    const saved = load(mode);
-    const defaults = defaultLayouts(mode, available);
-    if (!saved) return { layouts: defaults, hidden: [] };
-    // Drop modules that no longer exist in this mode; add new ones at their default spot.
-    const fix = (bp: keyof typeof COLS) => {
-      const list = (saved.layouts[bp] ?? []).filter((l) => available.has(l.i));
-      for (const d of defaults[bp]) if (!list.some((l) => l.i === d.i)) list.push(d);
-      return list.map((l) => ({ ...l, minW: MODULES[l.i].minW ? Math.min(MODULES[l.i].minW!, COLS[bp]) : undefined, minH: MODULES[l.i].minH }));
-    };
-    return { layouts: { lg: fix('lg'), md: fix('md'), sm: fix('sm') }, hidden: saved.hidden.filter((h) => available.has(h)) };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, available, resetKey]);
-
-  const [state, setState] = useState<Saved>(initial);
+  // --- persisted arrangement -------------------------------------------------
+  const [state, setState] = useState<Saved>(() => load(mode));
   const [stateKey, setStateKey] = useState(`${mode}|${resetKey}`);
   if (stateKey !== `${mode}|${resetKey}`) {
     setStateKey(`${mode}|${resetKey}`);
-    setState(initial);
+    setState(load(mode));
   }
-
-  const onLayoutChange = useCallback(
-    (_current: Layout[], all: Layouts) => {
+  const update = useCallback(
+    (fn: (prev: Saved) => Saved) =>
       setState((prev) => {
-        const next = { ...prev, layouts: { ...prev.layouts, ...all } };
+        const next = fn(prev);
         save(mode, next);
         return next;
-      });
-    },
+      }),
     [mode]
   );
 
-  const setHidden = (id: string, hide: boolean) =>
-    setState((prev) => {
-      const hidden = hide ? [...new Set([...prev.hidden, id])] : prev.hidden.filter((h) => h !== id);
-      const next = { ...prev, hidden };
-      save(mode, next);
-      return next;
-    });
+  // --- container width → columns, and the height left until the window bottom ---
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(1200);
+  const [fillHeight, setFillHeight] = useState(0);
+  useLayoutEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const measure = () => {
+      setWidth(el.clientWidth);
+      const scroller = el.closest('.overflow-y-auto') as HTMLElement | null;
+      if (scroller) {
+        const top = el.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
+        const padBottom = parseFloat(getComputedStyle(scroller).paddingBottom) || 0;
+        setFillHeight(Math.max(0, scroller.clientHeight - top - padBottom));
+      }
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    window.addEventListener('resize', measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, []);
+  const cols = columnsFor(width);
 
-  const visibleIds = [...available].filter((id) => !state.hidden.includes(id));
-  const visibleLayouts: Layouts = Object.fromEntries(
-    Object.entries(state.layouts).map(([bp, list]) => [bp, list.filter((l) => visibleIds.includes(l.i))])
+  // --- natural heights of fixed-content modules (used only for packing) ---------
+  const [heights, setHeights] = useState<Record<string, number>>({});
+  const observer = useRef<ResizeObserver | null>(null);
+  if (!observer.current && typeof ResizeObserver !== 'undefined') {
+    observer.current = new ResizeObserver((entries) => {
+      setHeights((prev) => {
+        let changed = false;
+        const next = { ...prev };
+        for (const e of entries) {
+          const id = (e.target as HTMLElement).dataset.hudModule;
+          if (!id) continue;
+          const h = Math.round((e.target as HTMLElement).offsetHeight);
+          if (Math.abs((prev[id] ?? 0) - h) >= 8) {
+            next[id] = h;
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    });
+  }
+  useEffect(() => () => observer.current?.disconnect(), []);
+  const measureRef = useCallback((el: HTMLDivElement | null) => {
+    if (el && observer.current) observer.current.observe(el);
+  }, []);
+
+  // --- layout ----------------------------------------------------------------
+  const visible = state.order.filter((id) => !state.hidden.includes(id) && MODULES[id]);
+  const heightKey = visible.map((id) => `${id}:${Math.round((heights[id] ?? 0) / 24)}`).join('|');
+  const sections = useMemo<Section[]>(() => {
+    const heightOf = (id: string) => (MODULES[id].elastic ? ELASTIC_MIN : heights[id] ?? DEFAULT_ESTIMATE);
+    if (cols === 1) return [{ kind: 'cols', columns: [visible] }];
+    const out: Section[] = [];
+    let run: string[] = [];
+    const flush = () => {
+      if (run.length) out.push({ kind: 'cols', columns: pack(run, Math.min(cols, run.length), heightOf) });
+      run = [];
+    };
+    for (const id of visible) {
+      if (state.wide.includes(id)) {
+        flush();
+        out.push({ kind: 'wide', id });
+      } else run.push(id);
+    }
+    flush();
+    return out;
+    // heightKey buckets heights so tiny content changes don't reshuffle modules.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cols, visible.join(','), state.wide.join(','), heightKey]);
+
+  // --- reordering (pointer-based; HTML5 drag & drop is intercepted by the desktop shell) ---
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ id: string; before: boolean } | null>(null);
+  const dropRef = useRef(dropTarget);
+  dropRef.current = dropTarget;
+
+  const moveTo = useCallback(
+    (id: string, targetId: string, before: boolean) =>
+      update((prev) => {
+        if (id === targetId) return prev;
+        const order = prev.order.filter((x) => x !== id);
+        const at = order.indexOf(targetId) + (before ? 0 : 1);
+        order.splice(at, 0, id);
+        return { ...prev, order };
+      }),
+    [update]
   );
 
+  const startDrag = (id: string) => (e: React.PointerEvent) => {
+    if (!editing || e.button !== 0) return;
+    e.preventDefault();
+    setDragId(id);
+    document.body.style.cursor = 'grabbing';
+    const onMove = (ev: PointerEvent) => {
+      const el = (document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)?.closest(
+        '[data-hud-module]'
+      ) as HTMLElement | null;
+      const target = el?.dataset.hudModule;
+      if (!el || !target || target === id) return setDropTarget(null);
+      const r = el.getBoundingClientRect();
+      setDropTarget({ id: target, before: ev.clientY < r.top + r.height / 2 });
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      document.body.style.cursor = '';
+      const drop = dropRef.current;
+      if (drop) moveTo(id, drop.id, drop.before);
+      setDragId(null);
+      setDropTarget(null);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  };
+
+  const nudge = (id: string, dir: -1 | 1) =>
+    update((prev) => {
+      const vis = prev.order.filter((x) => !prev.hidden.includes(x));
+      const i = vis.indexOf(id);
+      const neighbour = vis[i + dir];
+      if (!neighbour) return prev;
+      const order = prev.order.filter((x) => x !== id);
+      order.splice(order.indexOf(neighbour) + (dir === 1 ? 1 : 0), 0, id);
+      return { ...prev, order };
+    });
+
+  const toggle = (key: 'hidden' | 'wide', id: string, on: boolean) =>
+    update((prev) => ({
+      ...prev,
+      [key]: on ? [...new Set([...prev[key], id])] : prev[key].filter((x) => x !== id),
+    }));
+
+  // --- render ----------------------------------------------------------------
+  const renderCard = (id: string, stretch: boolean) => {
+    const def = MODULES[id];
+    const Icon = def.icon;
+    const elastic = Boolean(def.elastic);
+    const isDrop = dropTarget?.id === id;
+    const btn = 'p-0.5 rounded text-slate-500 hover:text-quantum-cyan';
+    return (
+      <div
+        key={id}
+        data-hud-module={id}
+        ref={elastic ? undefined : measureRef}
+        className={`glass-panel hud-radius flex flex-col overflow-hidden border-cyan-500/15 transition-opacity ${
+          elastic && stretch ? 'flex-[1_1_0%]' : 'flex-none'
+        } ${dragId === id ? 'opacity-40' : ''} ${editing ? 'outline outline-1 outline-dashed outline-cyan-500/25' : ''}`}
+        style={{
+          minHeight: elastic ? ELASTIC_MIN : undefined,
+          boxShadow: isDrop
+            ? `${dropTarget!.before ? 'inset 0 3px 0' : 'inset 0 -3px 0'} rgb(var(--accent))`
+            : undefined,
+        }}
+      >
+        <div
+          className={`flex items-center justify-between gap-2 px-3 h-7 shrink-0 border-b border-slate-800/70 ${
+            editing ? 'bg-cyan-500/5' : ''
+          }`}
+        >
+          <div className="flex items-center gap-1.5 min-w-0">
+            {editing && (
+              <span
+                onPointerDown={startDrag(id)}
+                className="cursor-grab active:cursor-grabbing touch-none text-slate-500 hover:text-quantum-cyan"
+                title={t('Drag to reorder')}
+              >
+                <GripVertical className="w-3.5 h-3.5" />
+              </span>
+            )}
+            <Icon className="w-3.5 h-3.5 text-quantum-cyan shrink-0" />
+            <span className="text-[10px] font-orbitron font-bold tracking-wider text-slate-200 uppercase truncate">
+              {t(def.title)}
+            </span>
+          </div>
+          {editing && (
+            <div className="flex items-center gap-0.5 shrink-0">
+              <button onClick={() => nudge(id, -1)} className={btn} title={t('Move up')}>
+                <ArrowUp className="w-3.5 h-3.5" />
+              </button>
+              <button onClick={() => nudge(id, 1)} className={btn} title={t('Move down')}>
+                <ArrowDown className="w-3.5 h-3.5" />
+              </button>
+              {cols > 1 && (
+                <button
+                  onClick={() => toggle('wide', id, !state.wide.includes(id))}
+                  className={`${btn} ${state.wide.includes(id) ? '!text-quantum-cyan' : ''}`}
+                  title={t('Full width')}
+                >
+                  <MoveHorizontal className="w-3.5 h-3.5" />
+                </button>
+              )}
+              <button onClick={() => toggle('hidden', id, true)} className={`${btn} hover:!text-rose-300`} title={t('Hide module')}>
+                <EyeOff className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+        </div>
+        <div className={`p-3 ${elastic ? 'flex-1 min-h-0 overflow-auto' : ''}`}>{def.render(ctx)}</div>
+      </div>
+    );
+  };
+
   return (
-    <div className={editing ? 'hud-grid-editing' : ''}>
+    <div>
       {editing && state.hidden.length > 0 && (
         <div className="mb-2 flex flex-wrap items-center gap-1.5">
           <span className="text-[10px] font-mono text-slate-500 uppercase">{t('Hidden modules')}:</span>
           {state.hidden.map((id) => (
             <button
               key={id}
-              onClick={() => setHidden(id, false)}
+              onClick={() => toggle('hidden', id, false)}
               className="flex items-center gap-1 rounded border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-mono text-cyan-200 hover:bg-cyan-500/20"
             >
               <Plus className="w-3 h-3" />
@@ -140,54 +339,28 @@ export const HudGrid: React.FC<{ ctx: ModuleCtx; editing: boolean; resetKey: num
           ))}
         </div>
       )}
-      <ResponsiveGrid
-        className="hud-grid"
-        layouts={visibleLayouts}
-        breakpoints={BREAKPOINTS}
-        cols={COLS}
-        rowHeight={30}
-        margin={[12, 12]}
-        containerPadding={[0, 0]}
-        isDraggable={editing}
-        isResizable={editing}
-        draggableHandle=".hud-drag"
-        draggableCancel=".hud-nodrag"
-        onLayoutChange={onLayoutChange}
-        compactType="vertical"
-        useCSSTransforms
-      >
-        {visibleIds.map((id) => {
-          const def = MODULES[id];
-          const Icon = def.icon;
-          return (
-            <div key={id} className="glass-panel hud-radius flex flex-col overflow-hidden border-cyan-500/15">
-              <div
-                className={`hud-drag flex items-center justify-between gap-2 px-3 h-7 shrink-0 border-b border-slate-800/70 ${
-                  editing ? 'cursor-move bg-cyan-500/5' : ''
-                }`}
-              >
-                <div className="flex items-center gap-1.5 min-w-0">
-                  {editing && <GripVertical className="w-3.5 h-3.5 text-slate-500 shrink-0" />}
-                  <Icon className="w-3.5 h-3.5 text-quantum-cyan shrink-0" />
-                  <span className="text-[10px] font-orbitron font-bold tracking-wider text-slate-200 uppercase truncate">
-                    {t(def.title)}
-                  </span>
-                </div>
-                {editing && (
-                  <button
-                    onClick={() => setHidden(id, true)}
-                    className="hud-nodrag p-0.5 rounded text-slate-500 hover:text-rose-300"
-                    title={t('Hide module')}
-                  >
-                    <EyeOff className="w-3.5 h-3.5" />
-                  </button>
-                )}
+
+      <div ref={containerRef} className="flex flex-col" style={{ gap: GAP, minHeight: fillHeight || undefined }}>
+        {sections.map((section, si) => {
+          const last = si === sections.length - 1;
+          if (section.kind === 'wide') {
+            return (
+              <div key={`w-${section.id}`} className={`flex flex-col ${last ? 'flex-1' : ''}`}>
+                {renderCard(section.id, last)}
               </div>
-              <div className="flex-1 min-h-0 overflow-auto p-3">{def.render(ctx)}</div>
+            );
+          }
+          return (
+            <div key={`c-${si}`} className={`flex items-stretch ${last ? 'flex-1' : ''}`} style={{ gap: GAP }}>
+              {section.columns.map((ids, ci) => (
+                <div key={ci} className="flex-1 min-w-0 flex flex-col" style={{ gap: GAP }}>
+                  {ids.map((id) => renderCard(id, true))}
+                </div>
+              ))}
             </div>
           );
         })}
-      </ResponsiveGrid>
+      </div>
     </div>
   );
 };

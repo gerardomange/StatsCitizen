@@ -138,28 +138,3 @@
   0%, 100% { opacity: 1; }
   50% { opacity: 0.25; }
 }
-
-/* Draggable HUD grid (react-grid-layout) */
-.hud-grid .react-grid-placeholder {
-  background: rgb(var(--accent) / 0.18) !important;
-  border: 1px dashed rgb(var(--accent) / 0.6);
-  border-radius: var(--hud-radius);
-  opacity: 1 !important;
-}
-.hud-grid .react-grid-item.react-draggable-dragging {
-  box-shadow: 0 0 28px -4px rgb(var(--accent) / 0.45);
-  z-index: 20;
-}
-.hud-grid .react-resizable-handle {
-  opacity: 0;
-}
-.hud-grid-editing .hud-grid .react-resizable-handle {
-  opacity: 1;
-}
-.hud-grid .react-resizable-handle::after {
-  border-color: rgb(var(--accent) / 0.8) !important;
-}
-.hud-grid-editing .hud-grid .react-grid-item > .glass-panel,
-.hud-grid-editing .react-grid-item.glass-panel {
-  outline: 1px dashed rgb(var(--accent) / 0.25);
-}
