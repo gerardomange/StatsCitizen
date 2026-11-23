@@ -3,7 +3,7 @@ import { translate, type Lang, type Vars } from '../i18n/index.js';
 import type { LiveTelemetryFrame } from '../types/telemetry.js';
 import { annState } from '../components/hud/hudUtils.js';
 import { getThemeById, resolveManufacturer, type ManufacturerTheme } from '../themes/manufacturers.js';
-import type { FeedState, Moment, OverlayLayout, OverlayWidget, ShowWhen } from './types.js';
+import type { Contract, FeedState, Moment, OverlayLayout, OverlayWidget, ShowWhen } from './types.js';
 
 export interface OverlayCtxValue {
   feed: FeedState;
@@ -140,8 +140,14 @@ export function widgetVisible(w: OverlayWidget, feed: FeedState, combat: boolean
       return connected && isSeated(feed.frame);
     case 'onFoot':
       return connected && !isSeated(feed.frame);
-    case 'hasContract':
-      return feed.contracts.some((c) => c.status === 'active' || (c.endedAt && Date.now() - Date.parse(c.endedAt) < 45_000));
+    case 'hasContract': {
+      // Same filter the contracts widget uses, so hidden contracts (e.g. "A Call to Arms")
+      // never keep a widget on screen with nothing to show.
+      const keep = contractFilter(w.options ?? {});
+      return feed.contracts.some(
+        (c) => keep(c) && (c.status === 'active' || (c.endedAt && Date.now() - Date.parse(c.endedAt) < 45_000))
+      );
+    }
     case 'combat':
       return combat;
   }
@@ -150,6 +156,24 @@ export function widgetVisible(w: OverlayWidget, feed: FeedState, combat: boolean
 export const opt = <T,>(options: Record<string, unknown> | undefined, key: string, fallback: T): T => {
   const v = options?.[key];
   return v === undefined || v === null ? fallback : (v as T);
+};
+
+const normName = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+/**
+ * Contracts the viewer shouldn't see: "A Call to Arms" (an open-ended subsidy contract that
+ * never completes) when enabled, plus any names listed in the free-text option.
+ */
+export const contractFilter = (options: Record<string, unknown>) => {
+  const patterns = String(opt(options, 'hideContracts', ''))
+    .split(',')
+    .map(normName)
+    .filter(Boolean);
+  if (opt(options, 'hideCallToArms', true)) patterns.push('call to arms');
+  return (c: Contract) => {
+    const name = normName(c.name ?? '');
+    return !patterns.some((p) => name.includes(p));
+  };
 };
 
 /** "DRAK_Cutlass_Black_1234" → "Cutlass Black". Prefers the backend's normalized name. */

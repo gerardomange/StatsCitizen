@@ -81,6 +81,11 @@ export const es: Record<string, string> = {
   'Stop live telemetry': 'Detener telemetría en vivo',
   'Hidden modules': 'Módulos ocultos',
   'Hide module': 'Ocultar módulo',
+  'Drag to reorder': 'Arrastra para reordenar',
+  'Move up': 'Mover antes',
+  'Move down': 'Mover después',
+  'Full width': 'Ancho completo',
+  'Move, reorder or hide modules': 'Reordenar, ensanchar u ocultar módulos',
 
   // --- HUD modes ---
   'NO SIGNAL': 'SIN SEÑAL',
@@ -621,6 +626,8 @@ export const es: Record<string, string> = {
   "Applies to every widget. Select a widget to override it individually.": "Aplica a todos los widgets. Selecciona un widget para cambiarlo individualmente.",
   // --- Stream overlay ---
   "Keep completed objectives": "Mantener objetivos completados",
+  'Hide "A Call to Arms"': 'Ocultar "A Call to Arms"',
+  "Hide contracts named (comma separated)": "Ocultar contratos llamados (separados por comas)",
   "Shrink to content (box is the max size)": "Ajustar al contenido (la caja es el tamaño máximo)",
   "Grow from": "Crecer desde",
   "Top": "Arriba",

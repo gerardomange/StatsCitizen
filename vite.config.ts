@@ -16,6 +16,12 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    watch: {
+      // Never let Vite's file watcher crawl Rust build output (src-tauri/target holds
+      // hundreds of thousands of files) or other build/release folders: the initial crawl
+      // starves Node's I/O pool and the app window stays blank for minutes.
+      ignored: ['**/src-tauri/**', '**/release/**', '**/dist/**', '**/dist-electron/**', '**/.hud-preview/**'],
+    },
   },
   build: {
     outDir: 'dist',

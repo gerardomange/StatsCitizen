@@ -23,7 +23,7 @@ StatsCitizen reads the game's **official local telemetry stream**: gRPC on `127.
   - weapons and countermeasures
 - **Adapts to what you're doing:** on foot, EVA, pilot, gunner and ground vehicle each get their own HUD.
 - **Manufacturer OS:** the app takes on your ship maker's branding, with a boot splash and optional sounds.
-- **Movable modules:** the HUD is a grid of modules you can move and resize, and there's a compact mode for a second monitor.
+- **Adaptive layout:** reorder, hide or widen modules; the HUD reflows to any monitor (vertical included) without leaving gaps, and lists like the live feed stretch to fill the space. There's also a compact mode for a second monitor.
 
 ### 🎥 Stream overlay for OBS
 Add it to OBS as a **Browser Source**. It updates live, with no refreshing.

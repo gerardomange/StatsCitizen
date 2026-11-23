@@ -8,6 +8,7 @@ import { cockpitAudio } from '../services/cockpitAudio.js';
 import { fracPct, pct, formatAlt } from '../components/hud/hudUtils.js';
 import type { Contract, Moment, MomentKind, WidgetType } from './types.js';
 import {
+  contractFilter,
   fmtAgo,
   fmtClock,
   fmtCompact,
@@ -133,11 +134,12 @@ const Contracts: React.FC<WidgetProps> = ({ variant, options }) => {
         !o.hidden &&
         (objectiveKind(o.state) !== 'done' || keepCompleted || now - Date.parse(o.updatedAt) < RECENT_OBJECTIVE_MS)
     );
-  const list = feed.contracts
+  const shown = feed.contracts.filter(contractFilter(options));
+  const list = shown
     .filter((c) => c.status === 'active' || (c.endedAt && now - Date.parse(c.endedAt) < 45_000))
     .sort((a, b) => (a.status === 'active' ? 0 : 1) - (b.status === 'active' ? 0 : 1))
     .slice(0, Math.max(1, max));
-  const activeCount = feed.contracts.filter((c) => c.status === 'active').length;
+  const activeCount = shown.filter((c) => c.status === 'active').length;
 
   const meta = (c: Contract) => {
     const counted = c.objectives.filter((o) => !o.hidden || objectiveKind(o.state) === 'done');
@@ -706,7 +708,7 @@ const Ticker: React.FC<WidgetProps> = ({ options }) => {
       </div>
       <div className="ov-seg">
         <span>{t('PROFIT')}</span>
-        <b className={`ov-mono ${sessionDelta(feed) >= 0 ? 'ov-good' : 'ov-bad'}`}>{fmtSigned(sessionDelta(feed), locale)}</b>
+        <b className={`ov-mono ${sessionDelta(feed) >= 0 ? 'ov-good' : 'ov-bad'}`}>{fmtSigned(sessionDelta(feed), locale)} aUEC</b>
       </div>
       <div className="ov-seg">
         <span>{t('DEATHS')}</span>
@@ -884,7 +886,7 @@ const Debrief: React.FC<WidgetProps> = ({ options }) => {
       <div className="ov-debrief-kicker">{t('Mission debrief')}</div>
       <div className="ov-debrief-title">{title}</div>
       <div className="ov-debrief-grid">
-        {stat(t('Profit'), fmtSigned(delta, locale), delta >= 0 ? 'ov-good' : 'ov-bad')}
+        {stat(t('Profit'), `${fmtSigned(delta, locale)} aUEC`, delta >= 0 ? 'ov-good' : 'ov-bad')}
         {stat(t('Contracts'), feed.contractsCompleted)}
         {stat(t('Deaths'), m?.deaths ?? 0, 'ov-bad')}
         {stat(t('Time'), fmtClock(now - feed.sessionStart))}
@@ -938,6 +940,8 @@ export const WIDGETS: Record<WidgetType, WidgetDef> = {
       bool('showTimer', 'Timer'),
       bool('showReward', 'Reward'),
       bool('keepCompletedObjectives', 'Keep completed objectives', false),
+      bool('hideCallToArms', 'Hide "A Call to Arms"'),
+      { key: 'hideContracts', label: 'Hide contracts named (comma separated)', type: 'text', default: '' },
       ...FIT_OPTIONS,
     ],
     Comp: Contracts,

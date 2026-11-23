@@ -490,7 +490,7 @@ where
 {
     let total = files.len();
     let cache_path = cache_file_for(sc_path);
-    let mut cache = cache_path.as_deref().map(load_cache).unwrap_or_default();
+    let cache = cache_path.as_deref().map(load_cache).unwrap_or_default();
 
     let mut results: Vec<Option<Result<SingleLogResult, String>>> = (0..total).map(|_| None).collect();
     let mut stamps: Vec<Option<(u64, u128)>> = Vec::with_capacity(total);

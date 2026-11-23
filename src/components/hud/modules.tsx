@@ -48,8 +48,13 @@ export interface ModuleDef {
   title: string;
   icon: React.FC<{ className?: string }>;
   render: (ctx: ModuleCtx) => React.ReactNode;
-  minW?: number;
-  minH?: number;
+  /**
+   * Elastic modules (lists) absorb leftover vertical space in their column and scroll inside.
+   * Fixed-content modules (vitals, gauges…) always keep their natural height.
+   */
+  elastic?: boolean;
+  /** Starts as a full-width row (users can toggle this per module). */
+  wide?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -589,11 +594,11 @@ const ContractsModule: React.FC<{ ctx: ModuleCtx }> = ({ ctx }) => {
 // Registry
 // ---------------------------------------------------------------------------
 export const MODULES: Record<string, ModuleDef> = {
-  vehicle: { title: 'Vehicle', icon: Rocket, render: (c) => <VehicleModule ctx={c} />, minW: 4, minH: 2 },
-  pilot: { title: 'Pilot', icon: User, render: (c) => <PilotStrip frame={c.frame} />, minW: 4, minH: 2 },
-  shields: { title: 'Shields & hull', icon: Shield, render: (c) => <ShieldsModule ctx={c} />, minW: 2, minH: 6 },
-  flight: { title: 'Flight instruments', icon: Gauge, render: (c) => <FlightModule ctx={c} />, minW: 4, minH: 6 },
-  drive: { title: 'Drive', icon: Gauge, render: (c) => <DriveModule ctx={c} />, minW: 3, minH: 4 },
+  vehicle: { title: 'Vehicle', icon: Rocket, render: (c) => <VehicleModule ctx={c} />, wide: true },
+  pilot: { title: 'Pilot', icon: User, render: (c) => <PilotStrip frame={c.frame} />, wide: true },
+  shields: { title: 'Shields & hull', icon: Shield, render: (c) => <ShieldsModule ctx={c} /> },
+  flight: { title: 'Flight instruments', icon: Gauge, render: (c) => <FlightModule ctx={c} /> },
+  drive: { title: 'Drive', icon: Gauge, render: (c) => <DriveModule ctx={c} /> },
   systems: {
     title: 'Systems',
     icon: Zap,
@@ -603,8 +608,6 @@ export const MODULES: Record<string, ModuleDef> = {
         <PowerMatrix power={c.frame?.vehicle?.state?.power} />
       </div>
     ),
-    minW: 2,
-    minH: 5,
   },
   threats: {
     title: 'Threats',
@@ -615,92 +618,41 @@ export const MODULES: Record<string, ModuleDef> = {
         <TurretVisionChip ctx={c} />
       </div>
     ),
-    minW: 2,
-    minH: 3,
   },
-  weapons: { title: 'Weapons', icon: Crosshair, render: (c) => <WeaponsPanel frame={c.frame} large={c.mode === 'gunner'} />, minW: 3, minH: 4 },
+  weapons: {
+    title: 'Weapons',
+    icon: Crosshair,
+    render: (c) => <WeaponsPanel frame={c.frame} large={c.mode === 'gunner'} />,
+  },
   controls: {
     title: 'Controls',
     icon: Gamepad2,
     render: (c) => (
       <QuickActions scPath={c.scPath} enabled={c.actionsEnabled} actions={c.mode === 'ground' ? GROUND_ACTIONS : SHIP_ACTIONS} />
     ),
-    minW: 3,
-    minH: 2,
   },
   footActions: {
     title: 'On-foot actions',
     icon: Gamepad2,
     render: (c) => <QuickActions scPath={c.scPath} enabled={c.actionsEnabled} actions={FPS_ACTIONS} />,
-    minW: 3,
-    minH: 2,
   },
-  vitals: { title: 'Vitals', icon: HeartPulse, render: (c) => <VitalsModule ctx={c} big={c.mode === 'fps'} />, minW: 3, minH: 6 },
-  environment: { title: 'Environment & suit', icon: Thermometer, render: (c) => <EnvironmentModule ctx={c} />, minW: 3, minH: 5 },
-  wallet: { title: 'Wallet & records', icon: Coins, render: (c) => <WalletModule ctx={c} />, minW: 3, minH: 5 },
-  suit: { title: 'EVA suit', icon: Wind, render: (c) => <SuitModule ctx={c} />, minW: 3, minH: 7 },
-  feed: { title: 'Live feed', icon: Activity, render: (c) => <FeedModule ctx={c} />, minW: 3, minH: 4 },
-  contracts: { title: 'Contracts', icon: Target, render: (c) => <ContractsModule ctx={c} />, minW: 3, minH: 3 },
+  vitals: { title: 'Vitals', icon: HeartPulse, render: (c) => <VitalsModule ctx={c} big={c.mode === 'fps'} /> },
+  environment: { title: 'Environment & suit', icon: Thermometer, render: (c) => <EnvironmentModule ctx={c} /> },
+  wallet: { title: 'Wallet & records', icon: Coins, render: (c) => <WalletModule ctx={c} /> },
+  suit: { title: 'EVA suit', icon: Wind, render: (c) => <SuitModule ctx={c} /> },
+  feed: { title: 'Live feed', icon: Activity, render: (c) => <FeedModule ctx={c} />, elastic: true },
+  contracts: { title: 'Contracts', icon: Target, render: (c) => <ContractsModule ctx={c} />, elastic: true },
 };
 
-/** Default `lg` (12-column) layout per HUD mode: [moduleId, x, y, w, h]. */
-type Slot = [string, number, number, number, number];
+/** Default module order per HUD mode. Layout is computed from this order, never from coordinates. */
+const SHIP = ['vehicle', 'pilot', 'flight', 'shields', 'systems', 'weapons', 'controls', 'contracts', 'feed'];
 
-const SHIP: Slot[] = [
-  ['vehicle', 0, 0, 12, 3],
-  ['pilot', 0, 3, 12, 2],
-  ['shields', 0, 5, 3, 10],
-  ['flight', 3, 5, 6, 10],
-  ['systems', 9, 5, 3, 10],
-  ['weapons', 0, 15, 6, 8],
-  ['controls', 6, 15, 6, 4],
-  ['contracts', 6, 19, 6, 4],
-  ['feed', 0, 23, 12, 10],
-];
-
-export const DEFAULT_SLOTS: Record<HudMode, Slot[]> = {
+export const DEFAULT_ORDER: Record<HudMode, string[]> = {
   pilot: SHIP,
-  crew: SHIP.filter(([id]) => id !== 'controls'),
-  gunner: [
-    ['vehicle', 0, 0, 12, 3],
-    ['pilot', 0, 3, 12, 2],
-    ['weapons', 0, 5, 6, 11],
-    ['shields', 6, 5, 3, 11],
-    ['threats', 9, 5, 3, 5],
-    ['contracts', 9, 10, 3, 6],
-    ['feed', 0, 16, 12, 10],
-  ],
-  ground: [
-    ['vehicle', 0, 0, 12, 3],
-    ['pilot', 0, 3, 12, 2],
-    ['drive', 0, 5, 6, 7],
-    ['shields', 6, 5, 3, 10],
-    ['threats', 9, 5, 3, 5],
-    ['controls', 0, 12, 6, 3],
-    ['weapons', 9, 10, 3, 8],
-    ['contracts', 0, 15, 6, 4],
-    ['feed', 0, 19, 12, 10],
-  ],
-  fps: [
-    ['vitals', 0, 0, 4, 10],
-    ['environment', 4, 0, 4, 7],
-    ['wallet', 8, 0, 4, 7],
-    ['footActions', 4, 7, 8, 3],
-    ['feed', 0, 10, 8, 11],
-    ['contracts', 8, 10, 4, 11],
-  ],
-  eva: [
-    ['suit', 0, 0, 4, 9],
-    ['vitals', 4, 0, 4, 9],
-    ['wallet', 8, 0, 4, 9],
-    ['feed', 0, 9, 8, 10],
-    ['contracts', 8, 9, 4, 10],
-  ],
-  offline: [
-    ['vitals', 0, 0, 4, 10],
-    ['environment', 4, 0, 4, 7],
-    ['wallet', 8, 0, 4, 7],
-    ['feed', 0, 10, 8, 11],
-    ['contracts', 8, 10, 4, 11],
-  ],
+  crew: SHIP.filter((id) => id !== 'controls'),
+  gunner: ['vehicle', 'pilot', 'weapons', 'shields', 'threats', 'contracts', 'feed'],
+  ground: ['vehicle', 'pilot', 'drive', 'shields', 'threats', 'weapons', 'controls', 'contracts', 'feed'],
+  fps: ['vitals', 'environment', 'wallet', 'footActions', 'contracts', 'feed'],
+  eva: ['suit', 'vitals', 'wallet', 'contracts', 'feed'],
+  offline: ['vitals', 'environment', 'wallet', 'contracts', 'feed'],
 };

@@ -199,7 +199,8 @@ export const VsiGauge: React.FC<{ vsi?: number; radarAlt?: number; max?: number 
   const warn = v < -8 && radarAlt !== undefined && radarAlt < 600;
   const color = danger ? 'bg-rose-400' : warn ? 'bg-amber-400' : 'bg-quantum-cyan';
   return (
-    <div className="flex items-stretch gap-2 h-full min-h-[110px]">
+    // Fixed width: the readout changes every frame and must never push neighbouring tiles around.
+    <div className="flex items-stretch gap-2 h-full min-h-[110px] w-[84px] shrink-0">
       <div className="relative w-3 hud-radius bg-space-900 border border-slate-800 overflow-hidden">
         <div className="absolute left-0 right-0 top-1/2 h-px bg-slate-500" />
         <div
@@ -207,12 +208,16 @@ export const VsiGauge: React.FC<{ vsi?: number; radarAlt?: number; max?: number 
           style={clamped >= 0 ? { bottom: '50%', height: `${fill}%` } : { top: '50%', height: `${fill}%` }}
         />
       </div>
-      <div className="flex flex-col justify-between text-[9px] font-mono text-slate-500">
+      <div className="flex-1 min-w-0 flex flex-col justify-between text-[9px] font-mono text-slate-500">
         <span>+{max}</span>
         <div>
           <div className="text-[9px] text-slate-500">VSI</div>
-          <div className={`text-sm font-orbitron font-bold tabular-nums ${danger ? 'text-rose-300 animate-pulse' : 'text-white'}`}>
-            {vsi !== undefined ? `${v > 0 ? '+' : ''}${v.toFixed(1)}` : '0.0'}
+          <div
+            className={`text-sm font-mono font-bold tabular-nums whitespace-nowrap overflow-hidden ${
+              danger ? 'text-rose-300 animate-pulse' : 'text-white'
+            }`}
+          >
+            {vsi !== undefined ? `${v > 0 ? '+' : ''}${Math.abs(v) >= 100 ? Math.round(v) : v.toFixed(1)}` : '0.0'}
           </div>
           <div className="text-[9px]">m/s</div>
         </div>
